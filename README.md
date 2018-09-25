@@ -1,6 +1,6 @@
 # objc_msgSend 方法详解
 
-### 1. 消息机制.
+## 1. 消息机制.
 首先有这么一个类: `TYPerson`.
 
 - 它有个 `- (void)eat;`对象方法.
@@ -32,17 +32,19 @@ TYPerson *person = [[TYPerson alloc] init];
 ((void (*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("TYPerson"), sel_registerName("sleep"));
 ```
 
-### 2.objc_msgSend 的执行流程?
+## 2.objc_msgSend 的执行流程?
 
 > 1.消息发送阶段
+
 > 2.动态方法解析阶段
+
 > 3.消息转发阶段
 
-#### 2.1 消息发送阶段
+### 2.1 消息发送阶段
 
 通过 runtime 源码,搜索`objc_msgSend`, 在文件`objc-msg-arm64.s` 下.找到 `objc_msgSend`方法的入口.由汇编语言实现的:
 
-##### 2.1.1 objc_msgSend 方法入口: ENTRY _ objc_msgSend
+#### 2.1.1 objc_msgSend 方法入口: ENTRY _ objc_msgSend
 
 ```c
 ENTRY _objc_msgSend
@@ -98,7 +100,7 @@ LReturnZero:
 	END_ENTRY _objc_msgSend
 ```
 
-##### 2.1.2 查找缓存: CacheLookup NORMAL	
+#### 2.1.2 查找缓存: CacheLookup NORMAL	
 
 CacheLookup 是一个宏.
 
@@ -148,7 +150,7 @@ CacheLookup 是一个宏.
 .endmacro
 ```
 
-##### 2.1.3 缓存中没有找到: CheckMiss
+#### 2.1.3 缓存中没有找到: CheckMiss
 
 ```c++
 .macro CheckMiss
@@ -168,7 +170,7 @@ CacheLookup 是一个宏.
 .endmacro
 ```
 
-##### 2.1.4 __objc_msgSend_uncached
+#### 2.1.4 __objc_msgSend_uncached
 
 ```c++
 STATIC_ENTRY __objc_msgSend_uncached
@@ -184,7 +186,7 @@ STATIC_ENTRY __objc_msgSend_uncached
 	END_ENTRY __objc_msgSend_uncached
 ```
 
-##### 2.1.5 MethodTableLookup
+#### 2.1.5 MethodTableLookup
 
 ```c++
 .macro MethodTableLookup
@@ -232,7 +234,7 @@ STATIC_ENTRY __objc_msgSend_uncached
 .endmacro
 ```
 
-##### 2.1.6 没有缓存后的核心方法 _class_lookupMethodAndLoadCache3(id obj, SEL sel, Class cls)
+#### 2.1.6 没有缓存后的核心方法 _class_lookupMethodAndLoadCache3(id obj, SEL sel, Class cls)
 
 ```c++
 /***********************************************************************
@@ -248,7 +250,7 @@ IMP _class_lookupMethodAndLoadCache3(id obj, SEL sel, Class cls)
 }
 ```
 
-##### 2.1.7 lookUpImpOrForward(Class cls, SEL sel, id inst, bool initialize, bool cache, bool resolver)
+#### 2.1.7 lookUpImpOrForward(Class cls, SEL sel, id inst, bool initialize, bool cache, bool resolver)
 
 ```c++
 /***********************************************************************
@@ -420,7 +422,7 @@ IMP lookUpImpOrForward(Class cls, SEL sel, id inst,
 }
 ```
 
-##### 2.1.8 getMethodNoSuper_nolock(Class cls, SEL sel)
+#### 2.1.8 getMethodNoSuper_nolock(Class cls, SEL sel)
 
 ```c++
 static method_t *
@@ -449,7 +451,7 @@ getMethodNoSuper_nolock(Class cls, SEL sel)
 }
 ```
 
-##### 2.1.9 search_method_list(const method_list_t *mlist, SEL sel)
+#### 2.1.9 search_method_list(const method_list_t *mlist, SEL sel)
 
 ```c++
 /***********************************************************************
@@ -489,7 +491,7 @@ static method_t *search_method_list(const method_list_t *mlist, SEL sel)
 }
 ```
 
-##### 2.2.0 填充缓存 log_and_fill_cache(Class cls, IMP imp, SEL sel, id receiver, Class implementer)
+#### 2.2.0 填充缓存 log_and_fill_cache(Class cls, IMP imp, SEL sel, id receiver, Class implementer)
 
 ```c++
 /***********************************************************************
