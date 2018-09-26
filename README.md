@@ -1,6 +1,6 @@
 # objc_msgSend 方法详解
 
-### 1. 消息机制.
+## 1. 消息机制.
 首先有这么一个类: `TYPerson`.
 
 - 它有个 `- (void)eat;`对象方法.
@@ -32,24 +32,26 @@ TYPerson *person = [[TYPerson alloc] init];
 ((void (*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("TYPerson"), sel_registerName("sleep"));
 ```
 
-### 2.objc_msgSend 的执行流程?
+## 2.objc_msgSend 的执行流程?
 
 > 1.消息发送阶段
+
 > 2.动态方法解析阶段
+
 > 3.消息转发阶段
 
-#### 2.1 消息发送阶段
+### 2.1 消息发送阶段
 
 通过 runtime 源码,搜索`objc_msgSend`, 在文件`objc-msg-arm64.s` 下.找到 `objc_msgSend`方法的入口.由汇编语言实现的:
 
-##### ENTRY _ objc_msgSend
+#### 2.1.1 objc_msgSend 方法入口: ENTRY _ objc_msgSend
 
 ```c
 ENTRY _objc_msgSend
 	UNWIND _objc_msgSend, NoFrame
 	MESSENGER_START
 
-   // x0 寄存器,里面放的消息接收者
+        // x0 寄存器,里面放的消息接收者
 	cmp	x0, #0			// nil check and tagged pointer check
 	
 	// 当 le 条件成立的时候,就会跳到 LNilOrTagged
@@ -59,7 +61,7 @@ ENTRY _objc_msgSend
 	and	x16, x13, #ISA_MASK	// x16 = class	
 LGetIsaDone:
 
-   // 缓存查找
+        // 缓存查找
 	CacheLookup NORMAL		// calls imp or objc_msgSend_uncached
 
 LNilOrTagged:
@@ -98,7 +100,7 @@ LReturnZero:
 	END_ENTRY _objc_msgSend
 ```
 
-##### CacheLookup NORMAL	
+#### 2.1.2 查找缓存: CacheLookup NORMAL	
 
 CacheLookup 是一个宏.
 
@@ -113,10 +115,10 @@ CacheLookup 是一个宏.
 1:	cmp	x9, x1			// if (bucket->sel != _cmd)
 	b.ne	2f			//     scan more
 	
-	// 在缓存中找打了,直接调用
+	// 在缓存中找到了,调用并返回 imp 方法地址
 	CacheHit $0			// call or return imp
 	
-	// 没有找到的话,进去看下 CheckMiss 做了什么事情.
+	// 没有找到的话,执行 CheckMiss
 2:	// not hit: x12 = not-hit bucket
 	CheckMiss $0			// miss if bucket->sel == 0
 	cmp	x12, x10		// wrap if bucket == buckets
@@ -148,7 +150,7 @@ CacheLookup 是一个宏.
 .endmacro
 ```
 
-##### CheckMiss
+#### 2.1.3 缓存中没有找到: CheckMiss
 
 ```c++
 .macro CheckMiss
@@ -156,7 +158,7 @@ CacheLookup 是一个宏.
 .if $0 == GETIMP
 	cbz	x9, LGetImpMiss
 	
-	// 之前传进来的 NORMAL. 所以下面调用 cbz	x9, __objc_msgSend_uncached
+	// 根据之前传进来的参数 NORMAL. 所以下面调用 cbz x9, __objc_msgSend_uncached
 	// 继续看一下 __objc_msgSend_uncached 方法内部
 .elseif $0 == NORMAL
 	cbz	x9, __objc_msgSend_uncached
@@ -168,7 +170,7 @@ CacheLookup 是一个宏.
 .endmacro
 ```
 
-##### __objc_msgSend_uncached
+#### 2.1.4 __objc_msgSend_uncached
 
 ```c++
 STATIC_ENTRY __objc_msgSend_uncached
@@ -184,7 +186,7 @@ STATIC_ENTRY __objc_msgSend_uncached
 	END_ENTRY __objc_msgSend_uncached
 ```
 
-##### MethodTableLookup
+#### 2.1.5 MethodTableLookup
 
 ```c++
 .macro MethodTableLookup
@@ -208,8 +210,8 @@ STATIC_ENTRY __objc_msgSend_uncached
 	// receiver and selector already in x0 and x1
 	mov	x2, x16
 	
-	// 调用 __class_lookupMethodAndLoadCache3
-	// __class_lookupMethodAndLoadCache3 方法会返回找到的 imp 方法地址.
+	// 调用 __class_lookupMethodAndLoadCache3 方法.
+	// __class_lookupMethodAndLoadCache3 这个方法会返回找到的 imp 方法地址.
 	bl	__class_lookupMethodAndLoadCache3
 
 	// imp in x0
@@ -232,7 +234,7 @@ STATIC_ENTRY __objc_msgSend_uncached
 .endmacro
 ```
 
-##### ._class_lookupMethodAndLoadCache3
+#### 2.1.6 没有缓存后的核心方法 _class_lookupMethodAndLoadCache3(id obj, SEL sel, Class cls)
 
 ```c++
 /***********************************************************************
@@ -248,7 +250,7 @@ IMP _class_lookupMethodAndLoadCache3(id obj, SEL sel, Class cls)
 }
 ```
 
-##### lookUpImpOrForward
+#### 2.1.7 lookUpImpOrForward(Class cls, SEL sel, id inst, bool initialize, bool cache, bool resolver)
 
 ```c++
 /***********************************************************************
@@ -423,7 +425,7 @@ IMP lookUpImpOrForward(Class cls, SEL sel, id inst,
 }
 ```
 
-##### getMethodNoSuper_nolock(Class cls, SEL sel)
+#### 2.1.8 getMethodNoSuper_nolock(Class cls, SEL sel)
 
 ```c++
 static method_t *
@@ -452,7 +454,7 @@ getMethodNoSuper_nolock(Class cls, SEL sel)
 }
 ```
 
-##### search_method_list
+#### 2.1.9 search_method_list(const method_list_t *mlist, SEL sel)
 
 ```c++
 /***********************************************************************
@@ -492,7 +494,7 @@ static method_t *search_method_list(const method_list_t *mlist, SEL sel)
 }
 ```
 
-##### 填充缓存 log_and_fill_cache(Class cls, IMP imp, SEL sel, id receiver, Class implementer)
+#### 2.2.0 填充缓存 log_and_fill_cache(Class cls, IMP imp, SEL sel, id receiver, Class implementer)
 
 ```c++
 /***********************************************************************
