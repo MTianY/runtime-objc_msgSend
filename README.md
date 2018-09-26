@@ -358,10 +358,12 @@ IMP lookUpImpOrForward(Class cls, SEL sel, id inst,
     }
 
     // Try superclass caches and method lists.
+    // 如果上面没有找到,去找其父类的方法列表
     {
         unsigned attempts = unreasonableClassCount();
         for (Class curClass = cls->superclass;
              curClass != nil;
+             // 将当前类对象的父类取出来再赋值给 curClass
              curClass = curClass->superclass)
         {
             // Halt if there is a cycle in the superclass chain.
@@ -374,6 +376,7 @@ IMP lookUpImpOrForward(Class cls, SEL sel, id inst,
             if (imp) {
                 if (imp != (IMP)_objc_msgForward_impcache) {
                     // Found the method in a superclass. Cache it in this class.
+                    // 找到的话,将父类的方法缓存到消息接收者(最开始那个类)的缓存中去.
                     log_and_fill_cache(cls, imp, sel, inst, curClass);
                     goto done;
                 }
@@ -513,4 +516,15 @@ log_and_fill_cache(Class cls, IMP imp, SEL sel, id receiver, Class implementer)
     cache_fill (cls, sel, imp, receiver);
 }
 ```
+
+#### 2.2 图示
+
+![](https://lh3.googleusercontent.com/ZTm9TKEF2-VH1GsuaKLhnmK5DB1ZyjezbIcuCypEoMAVvdc0jNF8vf_g-siCuyJyGJu6dCkJ-Z_S9LRSAS_1865otTMeoyLSGkfbn-6k_RVf9Af7TGb5N3vHYvA1N0VG5Ij8lnwFAJEAwbNJ67hFQE1yiHA9l7eTMK30xxCCG-kZnZcdouORkbl9UWY261yb033RDKv2D5tnOrpH8O-me844jlnIFGGEAjTLejNMxbiAEOvksgB2ujyxKOz-DcvI7ag7hpV24bJ3mYdJNyPai9Gf2Aq3h7SPmXS5uisSG_KiTroX69Mp-MeWF7CSxjp5iUdXqNeXCjLQ4WEUYVAYKFcEwttYFKeG0iorSZkQMxOrjhPszNoTh78u11zVCtRh_4O_Dwi_EuAI4Psedq8kFSzeTh6QrQ5PJt3nMENTYL4QzV3YduGJKjuL4qfM0xACViHKIuv-rBC7orS6rWQx9BRFNSTGZPYarfItpIvEG-Uyu95ix89pv9pyhG5yyx5yS4BIK42-Ut8lNtsLQ9vzOfqWbnomJGr9EPWaTyLwYkJEtR7vCcUkbKKDTKWGPcYcBIB7fw2sxGa2JNrtHWS15sOPeWNgl3TPR7bmbyTsx0hJMrooEvjAhkyv7c3KU38=w924-h606-no)
+
+
+- 如果是从 `class_rw_t` 中查找方法
+    - 如果已经排序了,执行二分查找
+    - 如果没有排序,则遍历按顺序查找 
+- `receiver` 通过 `isa指针` 找到 `receiverClass`.
+- `receiverClass` 通过 `superclass 指针`找到 `superClass` .
 
