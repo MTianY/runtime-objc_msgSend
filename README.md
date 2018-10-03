@@ -401,7 +401,7 @@ IMP lookUpImpOrForward(Class cls, SEL sel, id inst,
     }
 
     // No implementation found. Try method resolver once.
-
+    // 如果找不到方法,那么就尝试动态方法解析
     if (resolver  &&  !triedResolver) {
         runtimeLock.unlockRead();
         _class_resolveMethod(cls, sel, inst);
@@ -529,4 +529,283 @@ log_and_fill_cache(Class cls, IMP imp, SEL sel, id receiver, Class implementer)
     - 如果没有排序,则遍历按顺序查找 
 - `receiver` 通过 `isa指针` 找到 `receiverClass`.
 - `receiverClass` 通过 `superclass 指针`找到 `superClass` .
+
+### 2.2 动态方法解析
+
+在上面的`IMP lookUpImpOrForward(Class cls, SEL sel, id inst,bool initialize, bool cache, bool resolver)`这个方法中.有段如下代码:
+
+```c++
+// No implementation found. Try method resolver once.
+    // 尝试动态方法解析
+    if (resolver  &&  !triedResolver) {
+        runtimeLock.unlockRead();
+        // 动态方法解析
+        _class_resolveMethod(cls, sel, inst);
+        runtimeLock.read();
+        // Don't cache the result; we don't hold the lock so it may have 
+        // changed already. Re-do the search from scratch instead.
+        // 动态解析过一次之后,将 triedResolver 标记为 YES. 那么下次进来之后就不会再动态解析
+        triedResolver = YES;
+        goto retry;
+    }
+```
+
+进入 `_class_resolveMethod(cls, sel, inst)` 方法,看其如何进行动态方法解析:
+
+- 会根据传进来的cls 是类对象还是元类对象执行不同的方法.
+
+```c++
+/***********************************************************************
+* _class_resolveMethod
+* Call +resolveClassMethod or +resolveInstanceMethod.
+* Returns nothing; any result would be potentially out-of-date already.
+* Does not check if the method already exists.
+**********************************************************************/
+void _class_resolveMethod(Class cls, SEL sel, id inst)
+{
+    // 如果传进来的类 cls 不是元类对象
+    // 那么就是类对象
+    if (! cls->isMetaClass()) {
+        // try [cls resolveInstanceMethod:sel]
+        _class_resolveInstanceMethod(cls, sel, inst);
+    } 
+    else {
+        // 如果传进来的是元类对象
+        // try [nonMetaClass resolveClassMethod:sel]
+        // and [cls resolveInstanceMethod:sel]
+        _class_resolveClassMethod(cls, sel, inst);
+        if (!lookUpImpOrNil(cls, sel, inst, 
+                            NO/*initialize*/, YES/*cache*/, NO/*resolver*/)) 
+        {
+            _class_resolveInstanceMethod(cls, sel, inst);
+        }
+    }
+}
+```
+
+看下`_class_resolveInstanceMethod` 方法的实现:
+
+```c++
+/***********************************************************************
+* _class_resolveInstanceMethod
+* Call +resolveInstanceMethod, looking for a method to be added to class cls.
+* cls may be a metaclass or a non-meta class.
+* Does not check if the method already exists.
+**********************************************************************/
+static void _class_resolveInstanceMethod(Class cls, SEL sel, id inst)
+{
+    if (! lookUpImpOrNil(cls->ISA(), SEL_resolveInstanceMethod, cls, 
+                         NO/*initialize*/, YES/*cache*/, NO/*resolver*/)) 
+    {
+        // Resolver not implemented.
+        return;
+    }
+
+    BOOL (*msg)(Class, SEL, SEL) = (typeof(msg))objc_msgSend;
+    bool resolved = msg(cls, SEL_resolveInstanceMethod, sel);
+
+    // Cache the result (good or bad) so the resolver doesn't fire next time.
+    // +resolveInstanceMethod adds to self a.k.a. cls
+    IMP imp = lookUpImpOrNil(cls, sel, inst, 
+                             NO/*initialize*/, YES/*cache*/, NO/*resolver*/);
+
+    if (resolved  &&  PrintResolving) {
+        if (imp) {
+            _objc_inform("RESOLVE: method %c[%s %s] "
+                         "dynamically resolved to %p", 
+                         cls->isMetaClass() ? '+' : '-', 
+                         cls->nameForLogging(), sel_getName(sel), imp);
+        }
+        else {
+            // Method resolver didn't add anything?
+            _objc_inform("RESOLVE: +[%s resolveInstanceMethod:%s] returned YES"
+                         ", but no new implementation of %c[%s %s] was found",
+                         cls->nameForLogging(), sel_getName(sel), 
+                         cls->isMetaClass() ? '+' : '-', 
+                         cls->nameForLogging(), sel_getName(sel));
+        }
+    }
+}
+```
+
+看下 `_class_resolveClassMethod` 方法的实现: 
+
+```c++
+/***********************************************************************
+* _class_resolveClassMethod
+* Call +resolveClassMethod, looking for a method to be added to class cls.
+* cls should be a metaclass.
+* Does not check if the method already exists.
+**********************************************************************/
+static void _class_resolveClassMethod(Class cls, SEL sel, id inst)
+{
+    assert(cls->isMetaClass());
+
+    if (! lookUpImpOrNil(cls, SEL_resolveClassMethod, inst, 
+                         NO/*initialize*/, YES/*cache*/, NO/*resolver*/)) 
+    {
+        // Resolver not implemented.
+        return;
+    }
+
+    BOOL (*msg)(Class, SEL, SEL) = (typeof(msg))objc_msgSend;
+    bool resolved = msg(_class_getNonMetaClass(cls, inst), 
+                        SEL_resolveClassMethod, sel);
+
+    // Cache the result (good or bad) so the resolver doesn't fire next time.
+    // +resolveClassMethod adds to self->ISA() a.k.a. cls
+    IMP imp = lookUpImpOrNil(cls, sel, inst, 
+                             NO/*initialize*/, YES/*cache*/, NO/*resolver*/);
+
+    if (resolved  &&  PrintResolving) {
+        if (imp) {
+            _objc_inform("RESOLVE: method %c[%s %s] "
+                         "dynamically resolved to %p", 
+                         cls->isMetaClass() ? '+' : '-', 
+                         cls->nameForLogging(), sel_getName(sel), imp);
+        }
+        else {
+            // Method resolver didn't add anything?
+            _objc_inform("RESOLVE: +[%s resolveClassMethod:%s] returned YES"
+                         ", but no new implementation of %c[%s %s] was found",
+                         cls->nameForLogging(), sel_getName(sel), 
+                         cls->isMetaClass() ? '+' : '-', 
+                         cls->nameForLogging(), sel_getName(sel));
+        }
+    }
+}
+```
+
+#### 动态解析阶段,动态添加方法示例.
+
+假如有如下类: `TYPerson`.
+
+- 对象方法: `- (void)playGame;` 且其只有声明,没有实现.
+
+调用如下方法: 
+
+```objc
+TYPerson *person = [[TYPerson alloc] init];
+[person playGame];
+```
+
+`[person playGame]` 分析:
+
+- 首先会来到 `IMP lookUpImpOrForward(Class cls, SEL sel, id inst, bool initialize, bool cache, bool resolver)` 这个方法.
+- 先试着从缓存找一下有没有`playGame` 方法.如果找到了,直接返回方法地址,拿去调用.
+
+```c++
+if(cache) {
+    imp = cache_getImp(cls, sel);
+    if(imp) return imp;
+}
+```
+
+- 如果缓存都没有找到的话,进到`getMethodNoSuper_nolock` 方法.
+
+```c++
+{
+    // 根据 cls 及其方法名 sel 来找方法
+    Method meth = getMethodNoSuper_nolock(cls, sel);
+    // 如果找到了
+    if(meth) {
+        // 将方法填充进缓存
+        log_and_fill_cache(cls, meth->imp, sel, inst, cls);
+        // 取出方法地址 imp
+        imp = meth->imp;
+        // 去 done 位置,返回 imp
+        goto done;
+    }
+}
+```
+
+- 如果上面的还没有找到,就去找其父类的缓存中找.如果缓存没有,继续去父类的方法列表中找.
+- 如果还找不到,进入动态方法解析阶段.此时我们在`TYPerson.m`文件中重写`+ (BOOL)resolveInstanceMethod:(SEL)sel` 方法. 因为是类对象.所以重写这个方法.
+- 打断点,就会拦截到.
+- 那么我们就可以在这个方法里,来动态的执行一些其他的方法.
+
+```objc
++ (BOOL)resolveInstanceMethod:(SEL)sel {
+    
+    NSLog(@"进入到动态方法解析阶段");
+    
+    return [super resolveInstanceMethod:sel];
+}
+```
+
+##### 进入动态方法解析阶段
+
+**写法1:**
+
+> 1.拿到一个其他的对象方法
+> 2.动态添加这个新方法
+
+```objc
+struct method_t {
+    SEL sel;
+    char *types;
+    IMP imp;
+};
+
++ (BOOL)resolveInstanceMethod:(SEL)sel {
+    if(sel == @selector(playGame)) {
+        // 1.拿到其他的方法
+        // Method newMethod = class_getInstanceMethod(self, @selector(eat));
+        struct method_t *method = (struct method_t *)class_getInstanceMethod(self, @selector(eat));
+        // 2.动态添加这个方法
+        class_addMethod(self, sel, method->imp, newMethod->types);
+        
+        return YES;
+    }
+    return [super resolveInstanceMethod:sel];
+}
+```
+
+- 其中 `Method` 如下:
+    - 这个结构体其实等同于 `method_t`
+
+```c++
+/// An opaque type that represents a method in a class definition.
+typedef struct objc_method *Method;
+```
+
+**写法2:**
+
+> 使用 `method_getImplementation(<#Method  _Nonnull m#>)` 获取方法地址
+> 使用 `method_getTypeEncoding(<#Method  _Nonnull m#>)` 获取函数编码
+
+```objc
++ (BOOL)resolveInstanceMethod:(SEL)sel {
+    
+    if (sel == @selector(playGame)) {
+        Method method = class_getInstanceMethod(self, @selector(eat));
+        class_addMethod(self, sel, method_getImplementation(method), method_getTypeEncoding(method));
+        return YES;
+    }
+    
+    return [super resolveInstanceMethod:sel];
+}
+```
+
+**调用 C 语言的方法**
+
+```objc
+void test_C (id self, SEL _cmd) {
+    NSLog(@"消息接收者:%@---- 函数: %@",self, NSStringFromSelector(_cmd));
+}
+
++ (BOOL)resolveInstanceMethod:(SEL)sel {
+    if(sel == @selector(playGame)){
+        class_addMethod(self, sel, (IMP)test_C, "v16@0:8");
+    }
+    return [super resolveInstanceMethod:sel];
+}
+```
+
+### 2.3 消息转发阶段
+
+
+
+
+
 

@@ -15,6 +15,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)eat;
 + (void)sleep;
+- (void)playGame;
 
 @end
 

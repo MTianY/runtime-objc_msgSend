@@ -12,10 +12,11 @@
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         TYPerson *person = [[TYPerson alloc] init];
-        [person eat];
+//        [person eat];
         // ((void (*)(id, SEL))(void *)objc_msgSend)((id)person, sel_registerName("eat"));
-        [TYPerson sleep];
+//        [TYPerson sleep];
         // ((void (*)(id, SEL))(void *)objc_msgSend)((id)objc_getClass("TYPerson"), sel_registerName("sleep"));
+        [person playGame];
     }
     return 0;
 }
