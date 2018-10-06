@@ -8,6 +8,7 @@
 
 #import "TYPerson.h"
 #import <objc/runtime.h>
+#import "TYStudent.h"
 
 struct method_t {
     SEL sel;
@@ -17,26 +18,26 @@ struct method_t {
 
 @implementation TYPerson
 
-void test_C (id self , SEL _cmd) {
-    NSLog(@"消息接收者:%@---- 函数: %@",self, NSStringFromSelector(_cmd));
-}
-
-- (void)eat {
-    NSLog(@"%s",__func__);
-}
-
-+ (void)sleep {
-    NSLog(@"%s",__func__);
-}
-
-+ (BOOL)resolveInstanceMethod:(SEL)sel {
-    
-    if (sel == @selector(playGame)) {
-        class_addMethod(self, sel, (IMP)test_C, "v16@0:8");
-    }
-    
-    return [super resolveInstanceMethod:sel];
-}
+//void test_C (id self , SEL _cmd) {
+//    NSLog(@"消息接收者:%@---- 函数: %@",self, NSStringFromSelector(_cmd));
+//}
+//
+//- (void)eat {
+//    NSLog(@"%s",__func__);
+//}
+//
+//+ (void)sleep {
+//    NSLog(@"%s",__func__);
+//}
+//
+//+ (BOOL)resolveInstanceMethod:(SEL)sel {
+//
+//    if (sel == @selector(playGame)) {
+//        class_addMethod(self, sel, (IMP)test_C, "v16@0:8");
+//    }
+//    
+//    return [super resolveInstanceMethod:sel];
+//}
 
 //+ (BOOL)resolveInstanceMethod:(SEL)sel {
 //
@@ -67,5 +68,36 @@ void test_C (id self , SEL _cmd) {
 //
 //    return [super resolveInstanceMethod:sel];
 //}
+
+#pragma mark - 消息转发
+- (id)forwardingTargetForSelector:(SEL)aSelector {
+    if (aSelector == @selector(playGame)) {
+//        return [TYStudent new];
+        return nil;
+    }
+    return [super forwardingTargetForSelector:aSelector];
+}
+
+// 如果上面返回 nil, 则会来到这个方法,要求返回一个方法签名
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector {
+    
+    if (aSelector == @selector(playGame)) {
+        return [NSMethodSignature signatureWithObjCTypes:"v16@0:8"];
+    }
+    return [super methodSignatureForSelector:aSelector];
+}
+
+/**
+ 如果上面的方法返回了一个合理的方法签名,则会调用下面这个方法
+
+ @param anInvocation 封装了一个方法调用,包括: 方法调用者 | 方法名 | 方法参数
+ 方法调用者: anInvocation.target
+ 方法名 :anInvocation.selector
+ 参数: [anInvocation getArgument:NULL atIndex:0]
+ */
+- (void)forwardInvocation:(NSInvocation *)anInvocation {
+    // 传进来一个新的方法调用者,调用方法
+    [anInvocation invokeWithTarget:[TYStudent new]];
+}
 
 @end

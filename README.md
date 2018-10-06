@@ -804,8 +804,62 @@ void test_C (id self, SEL _cmd) {
 
 ### 2.3 消息转发阶段
 
+当前类发消息,如果在该类中及其父类中均找不到方法,并且在方法动态解析阶段也没有做处理,那么就会来到消息转发阶段.
 
+消息转发阶段: 就是将自己做不了的事情,交给另一个`对象`来帮忙处理.
 
+例:
+
+> 如 `TYPerson` 类,其有个对象方法`playGame`.但是没有实现.现在调用`[[TYPerson new] playGame]`.没有在动态方法解析做处理,让他进到消息转发阶段.
+> `TYStudent`中有个方法`playGame`,并且有具体实现.
+
+```objc
+#pragma mark - 消息转发
+// 将其转发给 TYStudent 来处理
+- (id)forwardingTargetForSelector:(SEL)aSelector {
+    if (aSelector == @selector(playGame)) {
+        return [TYStudent new];
+    }
+    return [super forwardingTargetForSelector:aSelector];
+}
+```
+
+如果上面的方法返回 `nil`,就是说没有交给其他对象来处理,那么程序还不会立即崩溃,会再给其一次机会,来到下面这个方法:
+
+```objc
+// 如果上面返回 nil, 则会来到这个方法,要求返回一个方法签名
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector {
+    
+    if (aSelector == @selector(playGame)) {
+        return [NSMethodSignature signatureWithObjCTypes:"v16@0:8"];
+    }
+    return [super methodSignatureForSelector:aSelector];
+}
+```
+
+上面的这个方法如果返回一个合理的方法签名,那么会继续走下去,如果上面的方法还是返回 `nil`, 那么就会直接 `crash`, 来到`doesNotRecognizeSelector:`方法.如果返回了合理签名,则会来到如下方法: 
+
+```objc
+/**
+ 如果上面的方法返回了一个合理的方法签名,则会调用下面这个方法
+
+ @param anInvocation 封装了一个方法调用,包括: 方法调用者 | 方法名 | 方法参数
+ 方法调用者: anInvocation.target
+ 方法名 :anInvocation.selector
+ 参数: [anInvocation getArgument:NULL atIndex:0]
+ */
+- (void)forwardInvocation:(NSInvocation *)anInvocation {
+    // 传进来一个新的方法调用者,调用方法
+    [anInvocation invokeWithTarget:[TYStudent new]];
+}
+```
+
+![](https://lh3.googleusercontent.com/-xXDmW5ckZgw/W7huzK9tC7I/AAAAAAAAALw/rD1ZyVy1OrISnaWnZ64vUmMrJi9-RyM5ACHMYCw/I/15388136273625.jpg)
+
+如果是类方法,如 `[TYPerson test]`.
+那么会来到 `+ (id)forwardingTargetForSelector:(SEL)aSelector` 这个方法.
+
+- 因为 `forwardingTargetForSelector:`这个方法是通过`receiver(消息接收者)`调用的,当执行`类方法`时,其`消息接收者`是`TYPerson`.所以要调用`+`号开头的方法.
 
 
 

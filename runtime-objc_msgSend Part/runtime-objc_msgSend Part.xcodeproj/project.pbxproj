@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C393406216789B800C805DF /* TYStudent.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C393405216789B800C805DF /* TYStudent.m */; };
 		4C748D1A2157A3C10076536F /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C748D192157A3C10076536F /* main.m */; };
 		4C748D222157A3D50076536F /* TYPerson.m in Sources */ = {isa = PBXBuildFile; fileRef = 4C748D212157A3D50076536F /* TYPerson.m */; };
 /* End PBXBuildFile section */
@@ -24,6 +25,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4C393404216789B800C805DF /* TYStudent.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TYStudent.h; sourceTree = "<group>"; };
+		4C393405216789B800C805DF /* TYStudent.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TYStudent.m; sourceTree = "<group>"; };
 		4C748D162157A3C10076536F /* runtime-objc_msgSend Part */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "runtime-objc_msgSend Part"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C748D192157A3C10076536F /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		4C748D202157A3D50076536F /* TYPerson.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TYPerson.h; sourceTree = "<group>"; };
@@ -65,6 +68,8 @@
 				4C748D192157A3C10076536F /* main.m */,
 				4C748D202157A3D50076536F /* TYPerson.h */,
 				4C748D212157A3D50076536F /* TYPerson.m */,
+				4C393404216789B800C805DF /* TYStudent.h */,
+				4C393405216789B800C805DF /* TYStudent.m */,
 			);
 			path = "runtime-objc_msgSend Part";
 			sourceTree = "<group>";
@@ -125,6 +130,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C393406216789B800C805DF /* TYStudent.m in Sources */,
 				4C748D1A2157A3C10076536F /* main.m in Sources */,
 				4C748D222157A3D50076536F /* TYPerson.m in Sources */,
 			);
